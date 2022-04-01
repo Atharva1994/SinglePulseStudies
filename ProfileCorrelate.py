@@ -3,23 +3,20 @@ import numpy as np
 from SignalToNoise import *
 from Stokes import *
 
-def SubtractMean(data,dim,data_mean):
+def SubtractMean(datain,dataout,dim):
 
 	for i in range(dim[0]):
 		for j in range(dim[1]):
 			for k in range(dim[2]):
-				data_mean[i,j,k,:]=np.subtract(data[i,j,k,:],np.multiply(np.mean(data[i,j,k,:]),np.ones(dim[3])))
+				dataout[i,j,k,:]=np.subtract(datain[i,j,k,:],np.multiply(np.mean(datain[i,j,k,:]),np.ones(dim[3])))
 
 
-def compute(dataFolder,datafile,initfreq):
+def compute(dataFolder,datafile,initfreq,isStokes):
     arch=psr.Archive_load("/fred/oz005/users/akulkarn/J0437-4715/ProcessedDataAll/"+dataFolder+"/"+datafile)
     arch.fscrunch_to_nchan(16)
     arch.remove_baseline()
-    #arch.pscrunch()
-    #arch.convert_state('Stokes')
-    arch.centre_max_bin()
-    pol=0;
-    #arch.tscrunch_to_nsub(900)
+    #pol=0;
+    
 
     BW=arch.get_bandwidth()
     CentFreq=arch.get_centre_frequency()
@@ -30,33 +27,46 @@ def compute(dataFolder,datafile,initfreq):
     dim=data.shape
     freq_f=np.linspace((CentFreq-(BW/2)+(BW/(2*dim[2]))),(CentFreq+(BW/2)-(BW/(2*dim[2]))),num=dim[2])
 
-    R1=np.ndarray([dim[0],dim[2],dim[2]]); R1_mean=np.ndarray([dim[2]]); R1_std=np.ndarray([dim[2]])
-    data_mean=np.ndarray(dim); data_stokes=np.ndarray(dim); data_linpol=np.ndarray(dim) ; 
-    ArchSNR=np.ndarray([dim[0],dim[2]]); #ArchSNR_mean=np.ndarray(dim[2])
+    R1=np.ndarray([dim[0],dim[1],dim[2],dim[2]]); 
+    R1_mean=np.ndarray([dim[2],dim[1]]); 
+    R1_std=np.ndarray([dim[2],dim[1]])
+    data_mean=np.ndarray(dim); data_stokes=np.ndarray(dim);  
+    ArchSNR=np.ndarray([dim[0],dim[2]]); 
 
-    R1_mean_plot_f=np.ndarray([dim[2]]) ; R1_std_plot_f=np.ndarray([dim[2]]); R1_stder_plot_f=np.ndarray([dim[2]]);
+    R1_mean_plot_f=np.ndarray([dim[2],dim[1]]) ; 
+    R1_std_plot_f=np.ndarray([dim[2],dim[1]]); 
+    R1_stder_plot_f=np.ndarray([dim[2],dim[1]]);
     
-    #data_mean=data;#
-    #getStokes(data,data_stokes)
-    data_linpol=data
-    #getLinPol(data_stokes,data_linpol)
+    if (isStokes==True):
+        getStokes(data,data_stokes)
+    else:
+        data_stokes=data
     
-    SubtractMean(data_linpol,dim,data_mean) 
+    SubtractMean(data_stokes,data_mean,dim) 
     
     ArchiveSNR(arch,dim,ArchSNR)
-    #ArchSNR_mean=np.around(np.mean(ArchSNR,axis=0),decimals=2)
-
+    
     for i in range(dim[0]):
-        R1[i]=np.corrcoef(data_mean[i,pol,:,:])
+        for j in range(dim[1]):
+            R1[i,j]=np.corrcoef(data_mean[i,j,:,:])
 
-    rows=int(dim[2]/4); cols=int(4); #initfreq=6;
+        
+    #rows=int(dim[2]/4); cols=int(4); #initfreq=6;
 
     ############################# For computing mean and standard deviation of varaition in correlation coefficient at all frequencies  ##############################
 
-    for i in range(rows):
-        for j in range(cols):
-            R1_mean[cols*i+j]=np.mean(R1[:,initfreq,cols*i+j]); R1_std[cols*i+j]=np.std(R1[:,initfreq,cols*i+j])
+    #for i in range(rows):
+    #    for j in range(cols):
+    #        for k in range(dim[1]):
+    #            R1_mean[cols*i+j,k]=np.mean(R1[:,k,initfreq,cols*i+j]); 
+    #            R1_std[cols*i+j,k]=np.std(R1[:,k,initfreq,cols*i+j])
 
+    for i in range(dim[2]):
+        for k in range(dim[1]):
+            R1_mean[i,k]=np.mean(R1[:,k,initfreq,i]); 
+            R1_std[i,k]=np.std(R1[:,k,initfreq,i])
+
+            
 
 
     ################################# For plotting the mean and standard Deviation of the measured correlation coefficient as a function of frequency..######################
